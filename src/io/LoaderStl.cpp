@@ -49,6 +49,35 @@
 
 const char* LoaderStl::_ext = "stl";
 
+bool LoaderStl::parseFace(Tokenizer &tkn, vector<int> &coordIndex, vector<float> &coord, vector<float> &normal, int &nCoords) {
+    if(!tkn.expecting("facet")) {
+        if(tkn == "endsolid") return true;
+        return false;
+    }
+    if(!tkn.expecting("normal")) return false;
+    Vec3f vecNormal;
+    if(!tkn.getVec3f(vecNormal)) return false;
+    normal.push_back(vecNormal.x);
+    normal.push_back(vecNormal.y);
+    normal.push_back(vecNormal.z);
+    if(!tkn.expecting("outer") || !tkn.expecting("loop")) return false;
+    while(true) {
+        if(!tkn.expecting("vertex")) break;
+        Vec3f vecCoord;
+        if(!tkn.getVec3f(vecCoord)) return false;
+        coord.push_back(vecCoord.x);
+        coord.push_back(vecCoord.y);
+        coord.push_back(vecCoord.z);
+        coordIndex.push_back(nCoords);
+        nCoords++;
+    }
+
+    if(!(tkn == "endloop")) return false;
+    if(!tkn.expecting("endfacet")) return false;
+    coordIndex.push_back(-1);
+    return true;
+}
+
 bool LoaderStl::load(const char* filename, SceneGraph& wrl) {
   bool success = false;
 
@@ -71,17 +100,30 @@ bool LoaderStl::load(const char* filename, SceneGraph& wrl) {
     if(tkn.expecting("solid") && tkn.get()) {
       string stlName = tkn; // second token should be the solid name
 
-      // TODO ...
-
       // create the scene graph structure :
       // 1) the SceneGraph should have a single Shape node a child
+      Shape *shape = new Shape();
+      wrl.addChild(shape);
       // 2) the Shape node should have an Appearance node in its appearance field
+      Appearance *appearance = new Appearance();
+      shape->setAppearance(appearance);
+      shape->setName(stlName);
       // 3) the Appearance node should have a Material node in its material field
+      Material *mat = new Material();
+      appearance->setMaterial(mat);
+
       // 4) the Shape node should have an IndexedFaceSet node in its geometry node
+      IndexedFaceSet *ifs = new IndexedFaceSet();
+      shape->setGeometry(ifs);
 
       // from the IndexedFaceSet
       // 5) get references to the coordIndex, coord, and normal arrays
-      // 6) set the normalPerVertex variable to false (i.e., normals per face)  
+      vector<int> &coordIndex = ifs->getCoordIndex();
+      vector<float> &coord = ifs->getCoord();
+      vector<float> &normal = ifs->getNormal();
+
+      // 6) set the normalPerVertex variable to false (i.e., normals per face)
+      ifs->setNormalPerVertex(false);
 
       // the file should contain a list of triangles in the following format
 
@@ -93,6 +135,16 @@ bool LoaderStl::load(const char* filename, SceneGraph& wrl) {
       //   endloop
       // endfacet
 
+      int nCoords = 0;
+      int faceIdx = 0;
+      while(true) {
+          if(!parseFace(tkn, coordIndex, coord, normal, nCoords)) {
+              throw StrException("Failed to parse face index " + to_string(faceIdx));
+          }
+          faceIdx++;
+          if(tkn == "endsolid") break;
+      }
+
       // - run an infinite loop to parse all the faces
       // - write a private method to parse each face within the loop
       // - the method should return true if successful, and false if not
@@ -100,18 +152,16 @@ bool LoaderStl::load(const char* filename, SceneGraph& wrl) {
       //     update the normal, coord, and coordIndex variables
       // - if your method returns false
       //     throw an StrException explaining why the method failed
-
     }
 
     // close the file (this statement may not be reached)
     fclose(fp);
-    
+    success = true;
   } catch(StrException* e) { 
     
     if(fp!=(FILE*)0) fclose(fp);
     fprintf(stderr,"ERROR | %s\n",e->what());
     delete e;
-
   }
 
   return success;

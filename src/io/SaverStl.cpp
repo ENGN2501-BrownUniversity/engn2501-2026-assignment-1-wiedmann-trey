@@ -43,6 +43,8 @@
 
 #include "core/Faces.hpp"
 
+#include <filesystem>
+
 const char* SaverStl::_ext = "stl";
 
 //////////////////////////////////////////////////////////////////////
@@ -53,15 +55,30 @@ bool SaverStl::save(const char* filename, SceneGraph& wrl) const {
     // Check these conditions
 
     // 1) the SceneGraph should have a single child
+    if(wrl.getChildren().size() > 1) return false;
+
     // 2) the child should be a Shape node
+    if(!wrl.getChildren()[0]->isShape()) return false;
+
+
+    Shape *shape = static_cast<Shape*>(wrl.getChildren()[0]);
+
     // 3) the geometry of the Shape node should be an IndexedFaceSet node
+    if(!shape->hasGeometryIndexedFaceSet()) return false;
 
     // - construct an instance of the Faces class from the IndexedFaceSet
+    IndexedFaceSet *ifs = static_cast<IndexedFaceSet*>(shape->getGeometry());
+
     // - remember to delete it when you are done with it (if necessary)
     //   before returning
 
     // 4) the IndexedFaceSet should be a triangle mesh
+    if(!ifs->isTriangleMesh()) return false;
+
     // 5) the IndexedFaceSet should have normals per face
+    if(ifs->getNormalBinding() != IndexedFaceSet::PB_PER_FACE) return false;
+
+    Faces faces(0, ifs->getCoordIndex());
 
     // if (all the conditions are satisfied) {
 
@@ -71,20 +88,35 @@ bool SaverStl::save(const char* filename, SceneGraph& wrl) const {
       // if set, use ifs->getName()
       // otherwise use filename,
       // but first remove directory and extension
+      if(ifs->getName() != "") {
+          filename = ifs->getName().c_str();
+      } else {
+          filename = std::filesystem::path(filename).stem().string().c_str();
+      }
 
       fprintf(fp,"solid %s\n",filename);
+      vector<float> normals = ifs->getNormal();
+      vector<float> vertices = ifs->getCoord();
 
-      // TODO ...
-      // for each face {
-      //   ...
-      // }
-      
-      fclose(fp);
+      // for each face
+      for(int iF = 0; iF < faces.getNumberOfFaces(); iF++) {
+          float nx = normals[iF*3], ny = normals[iF*3 + 1], nz = normals[iF*3 +2];
+          fprintf(fp, "facet normal %f %f %f\n", nx, ny, nz);
+          fprintf(fp, "outer loop\n");
+          int faceSize = faces.getFaceSize(iF)-1;
+          for(int idx = 0; idx < faceSize; idx++) {
+              int iV = faces.getFaceVertex(iF, idx);
+              float vx = vertices[iV*3], vy = vertices[iV*3 + 1], vz = vertices[iV*3 + 2];
+              fprintf(fp, "vertex %f %f %f\n", vx, vy, vz);
+          }
+          fprintf(fp, "endloop\n");
+          fprintf(fp, "endfacet\n");
+      }
+
       success = true;
     }
-
-    // } endif (all the conditions are satisfied)
-
+    fprintf(fp,"endsolid %s\n",filename);
+    fclose(fp);
   }
   return success;
 }
