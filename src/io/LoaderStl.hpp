@@ -48,6 +48,8 @@ private:
 
   const static char* _ext;
 
+  bool parseFace(Tokenizer &tkn, vector<int> &coordIndex, vector<float> &coord, vector<float> &normal, int &nCoords);
+
 public:
 
   LoaderStl()  {};

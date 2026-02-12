@@ -36,48 +36,77 @@
 
 #include <math.h>
 #include "Faces.hpp"
-  
-Faces::Faces(const int nV, const vector<int>& coordIndex) {
-  // TODO
+
+Faces::Faces(const int nV, const vector<int>& coordIndex) : _nV(0), _nF(0), _nC(0), _coordIndex(coordIndex) {
+    _firstCornerFace.push_back(0);
+    for(int i = 0; i < _coordIndex.size(); i++) {
+        int idx = _coordIndex[i];
+        if(idx < 0) {
+            // is a -1 corner, replace with -(iF+1)
+            _coordIndex[i] = -(_nF+1);
+
+            // represents the end of a face
+            _firstCornerFace.push_back(_nC+1);
+            _nF++;
+        } else {
+            // is a vertex
+            _nV++;
+        }
+        _nC++;
+    }
 }
 
 int Faces::getNumberOfVertices() const {
-  // TODO
-  return 0;
+    return _nV;
 }
 
 int Faces::getNumberOfFaces() const {
-  // TODO
-  return 0;
+
+    return _nF;
 }
 
 int Faces::getNumberOfCorners() const {
-  // TODO
-  return 0;
+    return _nC;
 }
 
 int Faces::getFaceSize(const int iF) const {
-  // TODO
-  return 0;
+    if(iF >= _nF || iF < 0) return 0;
+
+    return _firstCornerFace[iF+1] - _firstCornerFace[iF];
 }
 
 int Faces::getFaceFirstCorner(const int iF) const {
-  // TODO
-  return -1;
+    if(iF >= _nF || iF < 0) return -1;
+
+    return _firstCornerFace[iF];
 }
 
 int Faces::getFaceVertex(const int iF, const int j) const {
-  // TODO
-  return -1;
+    if(iF >= _nF || iF < 0) return -1;
+    if(j < 0 || j >= getFaceSize(iF) - 1) return -1;
+
+    return _coordIndex[_firstCornerFace[iF]+j];
 }
 
 int Faces::getCornerFace(const int iC) const {
-  // TODO
-  return -1;
+    if(iC < 0 || iC >= _nC) return -1;
+    if(_coordIndex[iC] < 0) return -1;
+
+    int i = 1;
+    while(_coordIndex[iC+i] >= 0) {
+        i++;
+    }
+    return -_coordIndex[iC+i] - 1;
 }
 
 int Faces::getNextCorner(const int iC) const {
-  // TODO
-  return -1;
+    if(iC < 0 || iC >= _nC) return -1;
+    if(_coordIndex[iC] < 0) return -1;
+
+    if(_coordIndex[iC+1] < 0) { // need to wrap around to first corner of the face
+        int f = -_coordIndex[iC+1] - 1;
+        return _firstCornerFace[f];
+    }
+    return iC+1;
 }
 

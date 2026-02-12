@@ -89,7 +89,8 @@ public:
 
 private:
 
-  // TODO
+    int _nV, _nF, _nC;
+    vector<int> _coordIndex, _firstCornerFace;
 
 };
 
